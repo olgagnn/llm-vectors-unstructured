@@ -27,6 +27,8 @@ def get_embedding(llm, text):
         )
     return response.data[0].embedding
 
+from textblob import TextBlob
+
 def get_course_data(llm, chunk):
     data = {}
 
@@ -38,6 +40,7 @@ def get_course_data(llm, chunk):
     data['url'] = f"https://graphacademy.neo4j.com/courses/{data['course']}/{data['module']}/{data['lesson']}"
     data['text'] = chunk.page_content
     data['embedding'] = get_embedding(llm, data['text'])
+    data['topics'] = TextBlob(data['text']).noun_phrases
 
     return data
 
@@ -49,6 +52,11 @@ def create_chunk(tx, data):
         MERGE (l)-[:CONTAINS]->(p:Paragraph{text: $text})
         WITH p
         CALL db.create.setNodeVectorProperty(p, "embedding", $embedding)
+
+        FOREACH (topic in $topics |
+            MERGE (t:Topic {name: topic})
+            MERGE (p)-[:MENTIONS]->(t)
+        )
         """,
         data
         )
